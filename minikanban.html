@@ -1,0 +1,468 @@
+<title>Minikanban</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: module strip on top, status columns below, frosted panels floating on a soft colour wash (Arc-style). */
+:root {
+  --wash-1: #f3d9ff; --wash-2: #cfe6ff; --wash-3: #d4f5ec; --bg: #eef0f8;
+  --glass: rgb(255 255 255 / .55); --glass-line: rgb(255 255 255 / .75); --card: rgb(255 255 255 / .92);
+  --ink: #1c1d26; --muted: #6b6f80; --line: rgb(30 32 50 / .1); --hover: rgb(30 32 50 / .05);
+  --accent: #5b4fe0; --done: #2f9e5b; --danger: #d23b4f;
+  --shadow: 0 1px 2px rgb(30 30 60 / .06), 0 6px 20px rgb(60 50 120 / .08);
+  --m-indigo: #5b5fe0; --m-teal: #109a8c; --m-amber: #b9790a; --m-rose: #dc4a72; --m-violet: #9050e0; --m-sky: #2386d4;
+  --font-display: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --p-high: #e03131; --p-med: #7048e8; --p-low: #1c7ed6; --p-none: #a3a7b6;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root[data-app] {
+  --wash-1: #2a1d48; --wash-2: #142a46; --wash-3: #10302b; --bg: #14141c;
+  --glass: rgb(40 40 56 / .5); --glass-line: rgb(255 255 255 / .08); --card: rgb(46 46 62 / .9);
+  --ink: #ecedf4; --muted: #a0a3b5; --line: rgb(255 255 255 / .1); --hover: rgb(255 255 255 / .06);
+  --accent: #a59cff; --done: #5fd08e; --danger: #ff7a8a;
+  --shadow: 0 1px 2px rgb(0 0 0 / .3), 0 8px 24px rgb(0 0 0 / .25);
+  --m-indigo: #9da1ff; --m-teal: #4fd6c4; --m-amber: #f2c14e; --m-rose: #ff8aaa; --m-violet: #c39bff; --m-sky: #74bdf5;
+  --p-high: #ff6b6b; --p-med: #9775fa; --p-low: #4dabf7;
+  color-scheme: dark; } }
+
+* { box-sizing: border-box; }
+html { min-height: 100%; }
+body { min-height: 100%; color: var(--ink); font: 14px/1.45 var(--font-body); -webkit-font-smoothing: antialiased;
+  background: var(--bg);
+  background-image: radial-gradient(60% 50% at 0% 0%, var(--wash-1), transparent 70%),
+    radial-gradient(55% 55% at 100% 10%, var(--wash-2), transparent 70%),
+    radial-gradient(60% 60% at 50% 100%, var(--wash-3), transparent 70%);
+  background-attachment: fixed; }
+.wrap { padding-block: 26px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); max-width: 1100px; margin: 0 auto; display: grid; gap: 18px; }
+h1 { font: 700 24px/1.1 var(--font-display); margin: 0; letter-spacing: -.015em; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12px; }
+.muted { color: var(--muted); font-size: 12px; }
+.bar { height: 5px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.bar span { display: block; height: 100%; border-radius: 99px; background: var(--done); transition: width .3s ease; }
+
+.glass { background: var(--glass); border: 1px solid var(--glass-line); -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5); box-shadow: var(--shadow); }
+
+.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between; }
+.overall { flex: 0 1 300px; display: grid; gap: 6px; padding: 10px 14px; border-radius: 14px; }
+.overall-row { display: flex; justify-content: space-between; align-items: baseline; }
+
+/* modules */
+.mods { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr)); gap: 10px; }
+.mod { background: var(--glass); border: 1px solid var(--glass-line); -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5);
+  border-radius: 14px; padding: 11px 13px; display: grid; gap: 7px; cursor: pointer; min-width: 0; transition: background-color .15s, box-shadow .15s, transform .15s; }
+.mod:hover { background: var(--card); }
+.mod.on { background: var(--card); box-shadow: var(--shadow), inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent); }
+.mod-row { display: flex; align-items: center; gap: 8px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.mod-name { font: 600 14px var(--font-display); padding: 1px 4px; margin-left: -4px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mod-po { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.inline { border: 1px solid transparent; background: transparent; border-radius: 7px; padding: 2px 6px; min-width: 0; width: 100%; transition: background-color .12s; }
+.inline:hover { background: var(--hover); }
+.inline:focus { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--card); outline: none; }
+.inline::placeholder { color: var(--muted); }
+.mod-po .inline { font-size: 12px; color: var(--ink); }
+.mod-po .inline:placeholder-shown { font-style: italic; }
+.mod-x { border: 0; background: none; color: var(--muted); padding: 0 4px; border-radius: 5px; font-size: 16px; line-height: 1; visibility: hidden; }
+.mod:hover .mod-x, .mod-x:focus-visible { visibility: visible; }
+.mod-x:hover { color: var(--danger); background: var(--hover); }
+.mod.add { background: transparent; border: 1.5px dashed var(--line); -webkit-backdrop-filter: none; backdrop-filter: none; cursor: default; align-content: center; }
+.mod.add .inline { padding: 6px 8px; }
+
+/* board */
+.board-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 0 4px; }
+.board-head h2 { margin: 0; font: 600 16px var(--font-display); }
+.switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); cursor: pointer; user-select: none; }
+.switch input { appearance: none; -webkit-appearance: none; width: 30px; height: 18px; border-radius: 99px; background: var(--line); position: relative; margin: 0; cursor: pointer; transition: background-color .15s; }
+.switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / .25); transition: transform .15s; }
+.switch input:checked { background: var(--accent); }
+.switch input:checked::after { transform: translateX(12px); }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 14px; align-items: start; }
+.col { background: var(--glass); border: 1px solid var(--glass-line); -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5); box-shadow: var(--shadow);
+  border-radius: 18px; padding: 10px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0; }
+.col-head { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px 2px; font: 600 13px var(--font-display); }
+.new { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.new .tag { flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.new .tag select { max-width: 100%; }
+.new input { flex: 1 1 150px; min-width: 0; border: 1px solid transparent; background: var(--hover); border-radius: 10px; padding: 8px 11px; }
+.new input::placeholder { color: var(--muted); }
+.new input:focus { background: var(--card); border-color: color-mix(in srgb, var(--accent) 45%, transparent); outline: none; }
+.empty { color: var(--muted); font-size: 13px; text-align: center; padding: 16px 6px; }
+
+.card { min-width: 0; background: var(--card); border-radius: 12px; padding: 9px 9px 8px 7px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 6px;
+  box-shadow: 0 1px 1px rgb(30 30 60 / .04), 0 2px 8px rgb(30 30 60 / .06); transition: box-shadow .15s, transform .15s; }
+.card:hover { box-shadow: 0 2px 4px rgb(30 30 60 / .06), 0 8px 22px rgb(30 30 60 / .1); }
+.card.done { opacity: .7; }
+.card.done .t { text-decoration: line-through; color: var(--muted); }
+.check { width: 20px; height: 20px; margin-top: 3px; border-radius: 50%; border: 1.5px solid var(--line); background: transparent; display: grid; place-items: center; padding: 0; color: transparent; transition: all .15s; }
+.check:hover { border-color: var(--done); color: var(--done); }
+.check.on { background: var(--done); border-color: var(--done); color: #fff; }
+.check svg { width: 11px; height: 11px; }
+.body { display: grid; gap: 1px; min-width: 0; }
+textarea.inline { resize: none; overflow: hidden; display: block; line-height: 1.4; }
+.t { font-weight: 600; }
+.d { font-size: 13px; color: var(--ink); }
+.d:placeholder-shown { font-size: 12px; }
+.foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; padding-left: 6px; }
+.tag { position: relative; display: inline-flex; flex: none; }
+.tag select { appearance: none; -webkit-appearance: none; border: 0; border-radius: 99px; padding: 2px 22px 2px 9px; font-size: 12px; font-weight: 600; color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); cursor: pointer; max-width: 160px; text-overflow: ellipsis; }
+.tag select:hover { background: color-mix(in srgb, var(--c) 24%, transparent); }
+.tag select:disabled { cursor: default; }
+.tag::after { content: "▾"; position: absolute; right: 8px; top: 50%; transform: translateY(-52%); font-size: 10px; color: var(--c); pointer-events: none; }
+.tag option { color: var(--ink); background: var(--bg); }
+.new .tag select { padding-block: 8px; border-radius: 10px; }
+.foot .po { flex: 1 1 140px; display: flex; align-items: center; gap: 4px; color: var(--muted); min-width: 0; }
+.foot .po .inline { font-size: 12px; }
+.mini { border: 0; background: none; color: var(--muted); font-size: 12px; padding: 3px 7px; border-radius: 7px; white-space: nowrap; }
+.mini:hover { color: var(--ink); background: var(--hover); }
+.mini.del:hover { color: var(--danger); }
+
+.note { font-size: 12px; color: var(--muted); padding: 0 4px; }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--card); color: var(--ink);
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); box-shadow: var(--shadow), 0 0 0 1px var(--line);
+  padding: 10px 16px; border-radius: 99px; font-size: 13px; z-index: 30; display: flex; gap: 12px; align-items: center; max-width: calc(100% - 32px); }
+.toast button { background: none; border: 0; color: var(--accent); font-weight: 600; padding: 0; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+/* Priority: icon toggles low → medium → high → none on each issue; cards take the level's colour, module tiles a gradient of their open issues' colours. */
+.pri { flex: none; display: inline-grid; place-items: center; width: 26px; height: 24px; border: 0; border-radius: 7px; padding: 0; background: color-mix(in srgb, var(--pc) 14%, transparent); color: var(--pc); transition: background-color .12s; }
+.pri:hover { background: color-mix(in srgb, var(--pc) 26%, transparent); }
+.pri:disabled { cursor: default; }
+.pri svg { width: 14px; height: 14px; }
+.pri rect { fill: currentColor; opacity: .25; }
+.pri rect.on { opacity: 1; }
+.p-high { --pc: var(--p-high); } .p-med { --pc: var(--p-med); } .p-low { --pc: var(--p-low); } .p-none { --pc: var(--p-none); }
+.card.p-high, .card.p-med, .card.p-low { background: color-mix(in srgb, var(--pc) 9%, var(--card)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--pc) 45%, transparent), 0 2px 8px rgb(30 30 60 / .06); }
+.mod.has-grad, .mod.has-grad:hover, .mod.on.has-grad { background: var(--grad); }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1>Minikanban</h1>
+    <div class="overall glass">
+      <div class="overall-row"><span class="muted" id="ovLabel">All modules</span><span class="mono" id="ovCount">0 / 0 done</span></div>
+      <div class="bar"><span id="ovBar" style="width:0"></span></div>
+    </div>
+  </header>
+
+  <section class="mods" id="mods" aria-label="Modules"></section>
+
+  <section>
+    <div class="board-head">
+      <h2 id="boardTitle">All issues</h2>
+      <label class="switch" for="showDone"><input type="checkbox" id="showDone"> <span id="doneLabel">Show completed</span></label>
+    </div>
+    <div class="cols" id="cols" style="margin-top:10px"></div>
+  </section>
+
+  <div class="note" id="note"></div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const COLS = [{ id: 'todo', label: 'To do' }, { id: 'doing', label: 'In progress' }, { id: 'done', label: 'Done' }];
+const COLORS = ['indigo', 'teal', 'amber', 'rose', 'violet', 'sky'];
+const LOCAL_KEY = 'module-board-local-v1';
+
+const state = { modules: {}, issues: {}, mod: '', showDone: false, canWrite: true, mode: 'loading' };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const newId = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const color = (m) => `var(--m-${m && COLORS.includes(m.color) ? m.color : 'indigo'})`;
+
+/* ---------- storage: shared db when available, this browser otherwise ---------- */
+let db = null;
+function saveLocal() {
+  if (state.mode !== 'local') return;
+  if (window.mbNative) { window.webkit.messageHandlers.board.postMessage({ modules: state.modules, issues: state.issues }); return; }
+  try { localStorage.setItem(LOCAL_KEY, JSON.stringify({ modules: state.modules, issues: state.issues })); } catch {}
+}
+async function write(coll, id, data) {
+  if (!state.canWrite) return;
+  state[coll] = { ...state[coll], [id]: data };
+  render();
+  if (state.mode === 'db') { try { await db.collection(coll).doc(id).set(data); } catch (e) { writeFailed(e); } }
+  else saveLocal();
+}
+async function remove(coll, id) {
+  if (!state.canWrite) return;
+  const next = { ...state[coll] }; delete next[id]; state[coll] = next;
+  render();
+  if (state.mode === 'db') { try { await db.collection(coll).doc(id).delete(); } catch (e) { writeFailed(e); } }
+  else saveLocal();
+}
+function writeFailed(e) {
+  if (e && e.code === 'invalid_argument') { state.canWrite = false; render(); toast('You have view-only access, so changes aren’t saved.'); }
+  else toast('Couldn’t save that change. Check your connection and try again.');
+}
+function startLocal() {
+  state.mode = 'local';
+  try { const raw = JSON.parse(localStorage.getItem(LOCAL_KEY) || 'null'); if (raw) Object.assign(state, { modules: raw.modules || {}, issues: raw.issues || {} }); } catch {}
+  if (!Object.keys(state.modules).length) ['Design', 'Engineering', 'Research'].forEach((name, i) => { state.modules['m-' + name.toLowerCase()] = { name, color: COLORS[i], order: i }; });
+  render();
+}
+const toMap = (snap) => Object.fromEntries(snap.docs.filter((d) => d.exists).map((d) => [d.id, d.data()]));
+async function boot() {
+  try { state.showDone = localStorage.getItem('mb-showDone') === '1'; } catch {}
+  if (window.mbNative) {
+    // Inside the Mac app: the app owns the data and pushes widget edits back in.
+    document.documentElement.setAttribute('data-app', '');
+    Object.assign(state, { mode: 'local', modules: window.mbNative.initial.modules || {}, issues: window.mbNative.initial.issues || {} });
+    window.mbApply = (b) => { state.modules = b.modules || {}; state.issues = b.issues || {}; render(); };
+    return render();
+  }
+  render();
+  const c = window.claude;
+  if (!c || typeof c.use !== 'function') return startLocal();
+  try { db = await c.use('db'); } catch { db = null; }
+  if (!db) return startLocal();
+  state.mode = 'db';
+  try { const user = await c.use('user'); if (user && (await user.can('data.write')) === false) state.canWrite = false; } catch {}
+  const onErr = () => { $('note').dataset.error = '1'; $('note').textContent = 'Live updates stopped. Reload the page to reconnect.'; };
+  db.collection('modules').onSnapshot((s) => { state.modules = toMap(s); render(); }, onErr);
+  db.collection('issues').onSnapshot((s) => { state.issues = toMap(s); render(); }, onErr);
+  render();
+}
+
+/* ---------- render ---------- */
+const modList = () => Object.entries(state.modules).sort((a, b) => (a[1].order ?? 0) - (b[1].order ?? 0));
+const progress = (list) => ({ done: list.filter((i) => i.status === 'done').length, total: list.length });
+const pct = (p) => (p.total ? Math.round((p.done / p.total) * 100) : 0);
+
+// Hold re-renders while a pointer is down, so a click that blurs a field (and saves it) still lands on its button.
+let pointerDown = false, renderPending = false;
+document.addEventListener('pointerdown', () => { pointerDown = true; }, true);
+document.addEventListener('pointerup', () => { pointerDown = false; if (renderPending) setTimeout(() => { renderPending = false; render(); }, 0); }, true);
+document.addEventListener('pointercancel', () => { pointerDown = false; }, true);
+
+function render() {
+  if (pointerDown) { renderPending = true; return; }
+  // Keep whatever the viewer is typing in place while live updates re-render the page.
+  const a = document.activeElement;
+  const keep = a && a.dataset && a.dataset.key ? { key: a.dataset.key, value: a.value, s: a.selectionStart, e: a.selectionEnd } : null;
+
+  const mods = modList();
+  if (state.mod && !state.modules[state.mod]) state.mod = '';
+  const issues = Object.entries(state.issues);
+  const ro = state.canWrite ? '' : 'disabled';
+
+  // overall
+  const scoped = issues.filter(([, i]) => !state.mod || i.moduleId === state.mod).map(([, i]) => i);
+  const op = progress(scoped);
+  const cur = state.modules[state.mod];
+  $('ovLabel').textContent = cur ? `${cur.name} progress` : 'Overall progress';
+  $('ovCount').textContent = `${op.done} / ${op.total} done · ${pct(op)}%`;
+  $('ovBar').style.width = pct(op) + '%';
+
+  // modules
+  $('mods').innerHTML = mods.map(([id, m]) => {
+    const p = progress(issues.filter(([, i]) => i.moduleId === id).map(([, i]) => i));
+    const grad = moduleGradient(issues.filter(([, i]) => i.moduleId === id && i.status !== 'done').map(([, i]) => prio(i)));
+    return `<div class="mod ${state.mod === id ? 'on' : ''} ${grad ? 'has-grad' : ''}" ${grad ? `style="--grad:${grad}"` : ''} data-mod="${esc(id)}" tabindex="0" role="button" aria-pressed="${state.mod === id}">
+      <div class="mod-row"><span class="dot" style="background:${color(m)}"></span><input class="inline mod-name" data-key="mn:${esc(id)}" data-modname="${esc(id)}" value="${esc(m.name)}" maxlength="60" aria-label="Module name" title="Click to rename" ${ro}>
+        ${state.canWrite ? `<button class="mod-x" data-delmod="${esc(id)}" aria-label="Delete ${esc(m.name)}" title="Delete module">×</button>` : ''}</div>
+      <div class="bar"><span style="width:${pct(p)}%"></span></div>
+      <div class="mod-po"><span class="mono">${p.done}/${p.total} done</span></div>
+    </div>`;
+  }).join('') + (state.canWrite ? `<div class="mod add"><input class="inline" id="newMod" data-key="newmod" placeholder="+ Add module" aria-label="New module name"></div>` : '');
+
+  // board
+  $('boardTitle').textContent = cur ? `${cur.name} issues` : 'All issues';
+  const doneCount = scoped.filter((i) => i.status === 'done').length;
+  $('doneLabel').textContent = `Show completed (${doneCount})`;
+  $('showDone').checked = state.showDone;
+  const visible = issues.filter(([, i]) => !state.mod || i.moduleId === state.mod);
+  $('cols').innerHTML = COLS.filter((c) => c.id !== 'done' || state.showDone).map((c) => {
+    const list = visible.filter(([, i]) => (i.status || 'todo') === c.id)
+      .sort(([, x], [, y]) => c.id === 'done' ? (y.completedAt || 0) - (x.completedAt || 0)
+        : PRIO[prio(x)].rank - PRIO[prio(y)].rank || (x.createdAt || 0) - (y.createdAt || 0));
+    const add = c.id !== 'done' && state.canWrite && mods.length
+      ? `<div class="new"><input data-key="new:${c.id}" data-new="${c.id}" placeholder="+ Add issue, press Enter" aria-label="New issue in ${c.label}">${tagSelect(addModule(), `data-addmod="1" data-key="addmod:${c.id}" aria-label="Module for new issue"`)}</div>` : '';
+    return `<div class="col"><div class="col-head"><span>${c.label}</span><span class="muted mono">${list.length}</span></div>
+      ${add}${list.length ? list.map(([id, i]) => card(id, i, ro)).join('') : `<div class="empty">${state.mode === 'loading' ? 'Loading…' : 'Nothing here'}</div>`}</div>`;
+  }).join('');
+
+  if (!$('note').dataset.error) $('note').textContent = state.canWrite ? '' : 'View-only: you can browse but not edit.';
+
+  document.querySelectorAll('textarea.inline').forEach(grow);
+  if (keep) {
+    const el = document.querySelector(`[data-key="${CSS.escape(keep.key)}"]`);
+    if (el && el.tagName === 'SELECT') el.focus();
+    else if (el) { el.value = keep.value; el.focus(); try { el.setSelectionRange(keep.s, keep.e); } catch {} if (el.tagName === 'TEXTAREA') grow(el); }
+  }
+}
+
+function card(id, i, ro) {
+  const m = state.modules[i.moduleId];
+  const done = i.status === 'done';
+  const move = done ? '' : i.status === 'doing' ? `<button class="mini" data-move="todo" data-id="${esc(id)}">← To do</button>` : `<button class="mini" data-move="doing" data-id="${esc(id)}">Start →</button>`;
+  return `<article class="card ${done ? 'done' : ''} p-${prio(i)}">
+    <button class="check ${done ? 'on' : ''}" data-toggle="${esc(id)}" title="${done ? 'Reopen' : 'Mark complete'}" aria-label="${done ? 'Reopen' : 'Mark complete'}" ${ro}>
+      <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg></button>
+    <div class="body">
+      <textarea class="inline t" rows="1" data-key="t:${esc(id)}" data-field="title" data-id="${esc(id)}" aria-label="Title" ${ro}>${esc(i.title)}</textarea>
+      <textarea class="inline d" rows="1" data-key="d:${esc(id)}" data-field="desc" data-id="${esc(id)}" placeholder="Add description" aria-label="Description" ${ro}>${esc(i.desc)}</textarea>
+    </div>
+    <div class="foot" style="grid-column:1/-1">
+      ${tagSelect(i.moduleId, `data-modsel="${esc(id)}" data-key="ms:${esc(id)}" aria-label="Module" title="Change module" ${ro}`)}
+      ${priButton(prio(i), `data-priissue="${esc(id)}"`, ro)}
+      <span style="flex:1"></span>
+      ${state.canWrite ? `${move}<button class="mini del" data-del="${esc(id)}" title="Delete issue">Delete</button>` : ''}
+    </div>
+  </article>`;
+}
+
+const PRIO = {
+  high: { label: 'High priority', bars: 3, rank: 0, next: 'none' },
+  med: { label: 'Medium priority', bars: 2, rank: 1, next: 'high' },
+  low: { label: 'Low priority', bars: 1, rank: 2, next: 'med' },
+  none: { label: 'No priority', bars: 0, rank: 3, next: 'low' },
+};
+const prio = (x) => (x && PRIO[x.priority] ? x.priority : 'none');
+
+// A module tile's wash: its open issues' priority colours, high → low, each band sized by how many issues have it.
+function moduleGradient(levels) {
+  const counts = ['high', 'med', 'low'].map((l) => [l, levels.filter((x) => x === l).length]).filter(([, n]) => n);
+  const total = counts.reduce((s, [, n]) => s + n, 0);
+  if (!total) return '';
+  const tint = (l) => `color-mix(in srgb, var(--p-${l}) 22%, var(--card))`;
+  if (counts.length === 1) return tint(counts[0][0]);
+  let at = 0;
+  const stops = counts.map(([l, n]) => { const mid = at + (n / total) * 50; at += (n / total) * 100; return `${tint(l)} ${mid.toFixed(0)}%`; });
+  return `linear-gradient(115deg, ${stops.join(', ')})`;
+}
+
+function priButton(level, attrs, ro) {
+  const p = PRIO[level];
+  const bars = [0, 1, 2].map((n) => `<rect class="${n < p.bars ? 'on' : ''}" x="${1 + n * 5}" y="${10 - n * 4}" width="3.5" height="${4 + n * 4}" rx="1"/>`).join('');
+  return `<button class="pri p-${level}" ${attrs} title="${p.label}${ro ? '' : ' (click to change)'}" aria-label="${p.label}" ${ro}><svg viewBox="0 0 15 15">${bars}</svg></button>`;
+}
+
+// The module an issue gets when added: the one picked next to the input, else the module being viewed, else the first.
+function addModule() {
+  if (state.addMod && state.modules[state.addMod]) return state.addMod;
+  return state.mod || (modList()[0] || [])[0] || '';
+}
+
+function tagSelect(selected, attrs) {
+  const m = state.modules[selected];
+  return `<span class="tag" style="--c:${m ? color(m) : 'var(--muted)'}"><select ${attrs}>
+    ${m ? '' : '<option value="" selected>No module</option>'}
+    ${modList().map(([id, x]) => `<option value="${esc(id)}" ${id === selected ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}
+  </select></span>`;
+}
+
+function grow(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+
+// Text wraps differently at each width, so resize the title and description boxes with the window.
+let growFrame;
+addEventListener('resize', () => {
+  cancelAnimationFrame(growFrame);
+  growFrame = requestAnimationFrame(() => document.querySelectorAll('textarea.inline').forEach(grow));
+});
+
+/* ---------- actions ---------- */
+let toastTimer;
+function toast(msg, undo) {
+  const t = $('toast');
+  t.innerHTML = `<span>${esc(msg)}</span>${undo ? '<button id="undo">Undo</button>' : ''}`;
+  t.hidden = false;
+  if (undo) $('undo').onclick = () => { t.hidden = true; undo(); };
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, undo ? 6000 : 3500);
+}
+
+function setStatus(id, status) {
+  const i = state.issues[id]; if (!i) return;
+  const next = { ...i, status, completedAt: status === 'done' ? Date.now() : null };
+  if (status === 'done') next.prevStatus = i.status;
+  write('issues', id, next);
+  if (status === 'done' && !state.showDone) toast(`Completed “${i.title}”.`, () => write('issues', id, i));
+}
+
+function addIssue(status, title) {
+  const moduleId = addModule();
+  if (!moduleId) return;
+  write('issues', newId('i'), { title, desc: '', priority: 'none', moduleId, status, createdAt: Date.now() });
+  if (state.mod && moduleId !== state.mod) toast(`Added to ${state.modules[moduleId].name}.`);
+}
+
+document.addEventListener('change', (e) => {
+  const el = e.target;
+  if (el.dataset.addmod) { state.addMod = el.value; render(); }
+  else if (el.dataset.modsel) {
+    const id = el.dataset.modsel, i = state.issues[id];
+    if (!i || i.moduleId === el.value) return;
+    write('issues', id, { ...i, moduleId: el.value });
+    if (state.mod && el.value !== state.mod) toast(`Moved “${i.title}” to ${state.modules[el.value].name}.`, () => write('issues', id, i));
+  }
+});
+
+// Save inline edits when the field loses focus.
+document.addEventListener('focusout', (e) => {
+  const el = e.target;
+  if (el.dataset.field && el.dataset.id) {
+    const i = state.issues[el.dataset.id]; if (!i) return;
+    const v = el.value.trim();
+    if (el.dataset.field === 'title' && !v) { el.value = i.title; return; }
+    if ((i[el.dataset.field] || '') !== v) write('issues', el.dataset.id, { ...i, [el.dataset.field]: v });
+  } else if (el.dataset.modname) {
+    const m = state.modules[el.dataset.modname]; const v = el.value.trim();
+    if (!m) return;
+    if (!v) { el.value = m.name; return; }
+    if (m.name !== v) write('modules', el.dataset.modname, { ...m, name: v });
+  }
+});
+
+document.addEventListener('input', (e) => { if (e.target.matches('textarea.inline')) grow(e.target); });
+
+document.addEventListener('keydown', (e) => {
+  const el = e.target;
+  if (e.key === 'Enter' && el.dataset.new && el.value.trim()) { e.preventDefault(); const v = el.value.trim(); el.value = ''; addIssue(el.dataset.new, v); }
+  else if (e.key === 'Enter' && el.id === 'newMod' && el.value.trim()) {
+    e.preventDefault();
+    const name = el.value.trim(); el.value = '';
+    const order = Math.max(-1, ...Object.values(state.modules).map((m) => m.order ?? 0)) + 1;
+    write('modules', newId('m'), { name, color: COLORS[order % COLORS.length], order });
+  }
+  else if (e.key === 'Enter' && !e.shiftKey && (el.dataset.field === 'title' || el.dataset.modname)) { e.preventDefault(); el.blur(); }
+  else if (e.key === 'Escape' && el.matches('.inline, .new input')) el.blur();
+  else if ((e.key === 'Enter' || e.key === ' ') && el.matches('.mod[data-mod]')) { e.preventDefault(); el.click(); }
+});
+
+document.addEventListener('click', (e) => {
+  const t = e.target;
+  const pr = t.closest('.pri');
+  if (pr) {
+    e.stopPropagation();
+    const [coll, id] = pr.dataset.priissue ? ['issues', pr.dataset.priissue] : ['modules', pr.dataset.primod];
+    const x = state[coll][id];
+    if (x) write(coll, id, { ...x, priority: PRIO[prio(x)].next });
+    return;
+  }
+  const tog = t.closest('[data-toggle]');
+  if (tog) { const i = state.issues[tog.dataset.toggle]; if (i) setStatus(tog.dataset.toggle, i.status === 'done' ? (i.prevStatus || 'todo') : 'done'); return; }
+  const mv = t.closest('[data-move]');
+  if (mv) { setStatus(mv.dataset.id, mv.dataset.move); return; }
+  const del = t.closest('[data-del]');
+  if (del) { const id = del.dataset.del, i = state.issues[id]; remove('issues', id); toast('Issue deleted.', () => write('issues', id, i)); return; }
+  const dm = t.closest('[data-delmod]');
+  if (dm) {
+    e.stopPropagation();
+    const id = dm.dataset.delmod, m = state.modules[id];
+    const own = Object.entries(state.issues).filter(([, i]) => i.moduleId === id);
+    (async () => { for (const [iid] of own) await remove('issues', iid); await remove('modules', id); })();
+    toast(`Deleted ${m.name}${own.length ? ` and its ${own.length} issue${own.length === 1 ? '' : 's'}` : ''}.`, async () => {
+      await write('modules', id, m); for (const [iid, i] of own) await write('issues', iid, i);
+    });
+    return;
+  }
+  const mod = t.closest('.mod[data-mod]');
+  if (mod && !t.closest('input')) { state.mod = state.mod === mod.dataset.mod ? '' : mod.dataset.mod; state.addMod = ''; render(); }
+});
+
+$('showDone').onchange = (e) => { state.showDone = e.target.checked; try { localStorage.setItem('mb-showDone', state.showDone ? '1' : '0'); } catch {} render(); };
+
+boot();
+</script>
