@@ -1,3 +1,5 @@
+<img src="icon.png" width="96" alt="Minikanban icon">
+
 # Minikanban
 
 A small Mac board for tracking issues across the modules or areas of a project. It lives in your menu bar, opens as a window, and comes with a desktop widget.
@@ -8,7 +10,8 @@ A small Mac board for tracking issues across the modules or areas of a project. 
 - Module tiles show a gradient of their open issues' priority colours, so busy modules stand out
 - Mark issues complete to hide them; turn on **Show completed** to see them again
 - Progress bars for every module and overall
-- Desktop widget with progress and your most urgent issues, which you can tick off from the widget
+- Collapse or expand the To do, In progress and Done columns by clicking their headers
+- Desktop widget with your top 5 high-priority issues (or the next 5 open ones), which you can tick off from the widget
 - Light, dark, or match the system (gear button, bottom right)
 
 ## Installing

@@ -82,7 +82,13 @@ button { cursor: pointer; }
 .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 14px; align-items: start; }
 .col { background: var(--glass); border: 1px solid var(--glass-line); -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5); box-shadow: var(--shadow);
   border-radius: 18px; padding: 10px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0; }
-.col-head { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px 2px; font: 600 13px var(--font-display); }
+.col-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; padding: 4px 6px 2px; font: 600 13px var(--font-display);
+  background: none; border: 0; color: inherit; text-align: left; cursor: pointer; border-radius: 8px; }
+.col-head:hover { background: var(--hover); }
+.col-head:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 1px; }
+.col-head .lbl { display: inline-flex; align-items: center; gap: 6px; }
+.chev { width: 12px; height: 12px; color: var(--muted); transition: transform .2s ease; flex: none; }
+.col.collapsed .chev { transform: rotate(-90deg); }
 .new { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .new .tag { flex: 0 1 auto; min-width: 0; max-width: 100%; }
 .new .tag select { max-width: 100%; }
@@ -123,6 +129,7 @@ textarea.inline { resize: none; overflow: hidden; display: block; line-height: 1
 .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--card); color: var(--ink);
   -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); box-shadow: var(--shadow), 0 0 0 1px var(--line);
   padding: 10px 16px; border-radius: 99px; font-size: 13px; z-index: 30; display: flex; gap: 12px; align-items: center; max-width: calc(100% - 32px); }
+.toast[hidden] { display: none; }
 .toast button { background: none; border: 0; color: var(--accent); font-weight: 600; padding: 0; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 /* Priority: icon toggles low → medium → high → none on each issue; cards take the level's colour, module tiles a gradient of their open issues' colours. */
@@ -165,7 +172,7 @@ const COLS = [{ id: 'todo', label: 'To do' }, { id: 'doing', label: 'In progress
 const COLORS = ['indigo', 'teal', 'amber', 'rose', 'violet', 'sky'];
 const LOCAL_KEY = 'module-board-local-v1';
 
-const state = { modules: {}, issues: {}, mod: '', showDone: false, canWrite: true, mode: 'loading' };
+const state = { modules: {}, issues: {}, mod: '', showDone: false, collapsed: {}, canWrite: true, mode: 'loading' };
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const newId = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -205,6 +212,7 @@ function startLocal() {
 const toMap = (snap) => Object.fromEntries(snap.docs.filter((d) => d.exists).map((d) => [d.id, d.data()]));
 async function boot() {
   try { state.showDone = localStorage.getItem('mb-showDone') === '1'; } catch {}
+  try { state.collapsed = JSON.parse(localStorage.getItem('mb-collapsed') || '{}') || {}; } catch {}
   if (window.mbNative) {
     // Inside the Mac app: the app owns the data and pushes widget edits back in.
     document.documentElement.setAttribute('data-app', '');
@@ -279,7 +287,11 @@ function render() {
         : PRIO[prio(x)].rank - PRIO[prio(y)].rank || (x.createdAt || 0) - (y.createdAt || 0));
     const add = c.id !== 'done' && state.canWrite && mods.length
       ? `<div class="new"><input data-key="new:${c.id}" data-new="${c.id}" placeholder="+ Add issue, press Enter" aria-label="New issue in ${c.label}">${tagSelect(addModule(), `data-addmod="1" data-key="addmod:${c.id}" aria-label="Module for new issue"`)}</div>` : '';
-    return `<div class="col"><div class="col-head"><span>${c.label}</span><span class="muted mono">${list.length}</span></div>
+    const shut = !!state.collapsed[c.id];
+    const head = `<button class="col-head" data-collapse="${c.id}" aria-expanded="${!shut}" title="${shut ? 'Expand' : 'Collapse'} ${c.label}">
+      <span class="lbl"><svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 4.5 3 3 3-3"/></svg>${c.label}</span><span class="muted mono">${list.length}</span></button>`;
+    if (shut) return `<div class="col collapsed">${head}</div>`;
+    return `<div class="col">${head}
       ${add}${list.length ? list.map(([id, i]) => card(id, i, ro)).join('') : `<div class="empty">${state.mode === 'loading' ? 'Loading…' : 'Nothing here'}</div>`}</div>`;
   }).join('');
 
@@ -439,6 +451,14 @@ document.addEventListener('click', (e) => {
     const [coll, id] = pr.dataset.priissue ? ['issues', pr.dataset.priissue] : ['modules', pr.dataset.primod];
     const x = state[coll][id];
     if (x) write(coll, id, { ...x, priority: PRIO[prio(x)].next });
+    return;
+  }
+  const col = t.closest('[data-collapse]');
+  if (col) {
+    const id = col.dataset.collapse;
+    state.collapsed = { ...state.collapsed, [id]: !state.collapsed[id] };
+    try { localStorage.setItem('mb-collapsed', JSON.stringify(state.collapsed)); } catch {}
+    render();
     return;
   }
   const tog = t.closest('[data-toggle]');

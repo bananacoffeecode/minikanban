@@ -2,3 +2,5 @@
 dist/
 ModuleBoardMac/
 scripts/
+demo/
+*.mp4
