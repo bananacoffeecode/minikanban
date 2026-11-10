@@ -39,7 +39,7 @@ curl -fsSL https://raw.githubusercontent.com/bananacoffeecode/minikanban/main/in
 
 ## Using it
 
-- **Menu bar:** click the checklist icon. If you can't see it, your menu bar may be full or the icon may be behind the notch; check **System Settings → Menu Bar**.
+- **Menu bar:** click the checklist icon. It starts on the right, next to the system icons, so it isn't hidden behind the notch. Hold **Command** and drag it to move it. If you still can't see it, your menu bar may be too full; check **System Settings → Menu Bar**.
 - **Window:** the board also opens in a window at launch and lives in the Dock.
 - **Widget:** right-click the desktop → **Edit Widgets…** → search for **Minikanban**.
 - **Modules:** click a module's name to rename it, click elsewhere on the tile to filter, and hover for × to delete it.
