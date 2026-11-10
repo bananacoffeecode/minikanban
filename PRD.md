@@ -24,7 +24,7 @@ One simple board where you add and edit issues in place, see progress per module
 2. **Board:** To do and In progress columns. Type in a column's input and press Enter to add an issue, picking its module beside the input.
 3. **Inline editing:** title and description are edited on the card and save when you leave the field. The module tag on each card is a dropdown.
 4. **Priority:** a signal-bar icon on each card. Clicking it moves to the next level, and the card takes that level's colour. Higher priority sorts first.
-5. **Move:** "Start →" and "← To do" buttons on the card.
+5. **Move:** drag a card onto another column (including a collapsed one), or use the "Start →" and "← To do" buttons on the card. Dragging starts outside the text fields, so selecting text still works.
 6. **Complete:** the ✓ marks an issue done and hides it, with Undo. A "Show completed" switch adds a Done column where issues can be reopened.
 7. **Progress:** an overall bar in the header that switches to the selected module's progress.
 8. **Responsive:** works from phone width up, with no sideways scrolling.
@@ -36,4 +36,4 @@ One simple board where you add and edit issues in place, see progress per module
 - Data is saved on the Mac and shared between the app and the widget. It isn't synced across people.
 
 ## Later
-Due dates, search, comments, drag and drop, sync between the Mac app and the web board.
+Due dates, search, comments, reordering cards within a column, sync between the Mac app and the web board.

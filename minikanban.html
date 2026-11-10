@@ -89,6 +89,11 @@ button { cursor: pointer; }
 .col-head .lbl { display: inline-flex; align-items: center; gap: 6px; }
 .chev { width: 12px; height: 12px; color: var(--muted); transition: transform .2s ease; flex: none; }
 .col.collapsed .chev { transform: rotate(-90deg); }
+/* Drag a card onto another column to move it there. */
+.card[draggable="true"] { cursor: grab; }
+.card.dragging { opacity: .4; }
+.col { transition: box-shadow .12s, background-color .12s; }
+.col.drop { background: color-mix(in srgb, var(--accent) 10%, var(--glass)); box-shadow: var(--shadow), inset 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }
 .new { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .new .tag { flex: 0 1 auto; min-width: 0; max-width: 100%; }
 .new .tag select { max-width: 100%; }
@@ -290,8 +295,8 @@ function render() {
     const shut = !!state.collapsed[c.id];
     const head = `<button class="col-head" data-collapse="${c.id}" aria-expanded="${!shut}" title="${shut ? 'Expand' : 'Collapse'} ${c.label}">
       <span class="lbl"><svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 4.5 3 3 3-3"/></svg>${c.label}</span><span class="muted mono">${list.length}</span></button>`;
-    if (shut) return `<div class="col collapsed">${head}</div>`;
-    return `<div class="col">${head}
+    if (shut) return `<div class="col collapsed" data-col="${c.id}">${head}</div>`;
+    return `<div class="col" data-col="${c.id}">${head}
       ${add}${list.length ? list.map(([id, i]) => card(id, i, ro)).join('') : `<div class="empty">${state.mode === 'loading' ? 'Loading…' : 'Nothing here'}</div>`}</div>`;
   }).join('');
 
@@ -309,7 +314,7 @@ function card(id, i, ro) {
   const m = state.modules[i.moduleId];
   const done = i.status === 'done';
   const move = done ? '' : i.status === 'doing' ? `<button class="mini" data-move="todo" data-id="${esc(id)}">← To do</button>` : `<button class="mini" data-move="doing" data-id="${esc(id)}">Start →</button>`;
-  return `<article class="card ${done ? 'done' : ''} p-${prio(i)}">
+  return `<article class="card ${done ? 'done' : ''} p-${prio(i)}" data-card="${esc(id)}">
     <button class="check ${done ? 'on' : ''}" data-toggle="${esc(id)}" title="${done ? 'Reopen' : 'Mark complete'}" aria-label="${done ? 'Reopen' : 'Mark complete'}" ${ro}>
       <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2 5 8.5l4.5-5"/></svg></button>
     <div class="body">
@@ -480,6 +485,49 @@ document.addEventListener('click', (e) => {
   }
   const mod = t.closest('.mod[data-mod]');
   if (mod && !t.closest('input')) { state.mod = state.mod === mod.dataset.mod ? '' : mod.dataset.mod; state.addMod = ''; render(); }
+});
+
+/* ---------- drag and drop between columns ---------- */
+// Cards only become draggable when the press starts outside a text field or control, so selecting text still works.
+document.addEventListener('pointerdown', (e) => {
+  const c = e.target.closest('.card[data-card]');
+  if (c) c.draggable = state.canWrite && !e.target.closest('textarea, input, select, button');
+}, true);
+let dragId = null;
+const clearDrop = () => document.querySelectorAll('.col.drop').forEach((x) => x.classList.remove('drop'));
+document.addEventListener('dragstart', (e) => {
+  const c = e.target.closest && e.target.closest('.card[data-card]');
+  if (!c || !c.draggable) return;
+  dragId = c.dataset.card;
+  pointerDown = false;
+  e.dataTransfer.effectAllowed = 'move';
+  try { e.dataTransfer.setData('text/plain', dragId); } catch {}
+  requestAnimationFrame(() => c.classList.add('dragging'));
+});
+document.addEventListener('dragover', (e) => {
+  const col = dragId && e.target.closest && e.target.closest('.col[data-col]');
+  if (!col) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  if (!col.classList.contains('drop')) { clearDrop(); col.classList.add('drop'); }
+});
+document.addEventListener('dragleave', (e) => {
+  const col = e.target.closest && e.target.closest('.col[data-col]');
+  if (col && !col.contains(e.relatedTarget)) col.classList.remove('drop');
+});
+document.addEventListener('drop', (e) => {
+  const col = dragId && e.target.closest && e.target.closest('.col[data-col]');
+  if (!col) return;
+  e.preventDefault();
+  const id = dragId, to = col.dataset.col, i = state.issues[id];
+  dragId = null; clearDrop();
+  if (i && (i.status || 'todo') !== to) setStatus(id, to);
+  else render();
+});
+document.addEventListener('dragend', () => {
+  dragId = null; clearDrop();
+  document.querySelectorAll('.card.dragging').forEach((x) => x.classList.remove('dragging'));
+  document.querySelectorAll('.card[draggable="true"]').forEach((x) => { x.draggable = false; });
 });
 
 $('showDone').onchange = (e) => { state.showDone = e.target.checked; try { localStorage.setItem('mb-showDone', state.showDone ? '1' : '0'); } catch {} render(); };
